@@ -8,7 +8,7 @@
 static void initSystick();
 static void configureClock();
 static void initGPIO();
-static void delay(int);
+static void delay(uint32_t);
 void SystemInit();
 
 int main()
@@ -18,7 +18,7 @@ int main()
         // Toggle green LED.
         int odr = GPIOC->ODR ;
         GPIOC->BSRR = ((odr & GPIO_PIN_9) << 16) | (~odr & GPIO_PIN_9);
-        delay(100000);
+        delay(1000);
     } 
     return 0;
 }
@@ -76,7 +76,7 @@ static void initGPIO()
     readBit = RCC->AHBENR & RCC_AHBENR_GPIOCEN;
     (void)readBit;
 
-    /*Configure GPIO pin Output Level */
+    // Configure GPIO pin Output Level.
     GPIOC->BRR = (uint32_t)GPIO_PIN_9;
 
     // Configure direction mode.
@@ -86,9 +86,34 @@ static void initGPIO()
     GPIOC->MODER = temp;
 }
 
-static void delay(int d)
+static void delay(uint32_t d)
 {
-    while(d--);
+    for(int i = 0; i < 100; i++)
+    {
+        TIM6->CNT = 0x0000U;
+        while(TIM6->CNT < d);
+    }
+}
+
+static void initTimer()
+{
+    // Enable timer clock.
+    // From page 125 of ref manual:
+        //  Bit 4 TIM6EN: TIM6 timer clock enable
+        //  Set and cleared by software.
+        //  0: TIM6 clock disabled
+        //  1: TIM6 clock enabled
+    RCC->APB1ENR |= 1 << 4;
+
+    // Set prescalar.
+    TIM6->PSC = 6;
+    TIM6->ARR = 0xffff;
+
+    // Enable the timer.
+    TIM6->CR1 |= 0x00001U;
+
+    // Wait for update flag.
+    while(!(TIM6->SR & 0x1U));
 }
 
 void SystemInit()
@@ -96,4 +121,5 @@ void SystemInit()
     initSystick();
     configureClock();
     initGPIO();
+    initTimer();
 }
