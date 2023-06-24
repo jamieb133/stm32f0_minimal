@@ -12,11 +12,11 @@ make
 ### Upload
 To flash the program you can use st-link:
 ```
-sudo apt install st-link
+sudo apt install stlink-tools
 ```
 ```
 # Write to the base flash address space.
-st-link write stm32f0_minimal.bin 0x08000000
+st-flash write stm32f0_minimal.bin 0x08000000
 ```
 
 ### Debug
@@ -56,7 +56,7 @@ gdb-multiarch stm32f0_minimal
 ```
 Connect to the gdb server, load the binary, and reset the program counter.
 ```
-(gdb) target remote-extended localhost:3333
+(gdb) target remote localhost:3333
 (gdb) file stm32f0_minimal
 (gdb) set $pc=Reset_Handler
 ```

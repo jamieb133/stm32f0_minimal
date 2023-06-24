@@ -1,0 +1,17 @@
+{
+    "version": 2,
+    "configurePresets": [
+        {
+            "name": "stm32f0",
+            "displayName": "Build for stm32f0",
+            "description": "",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/BUILD",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain.cmake",
+                "ARM_TOOLCHAIN_DIR": "/home/jamie/Dev/gcc-arm"
+            }
+        }
+    ]
+}
