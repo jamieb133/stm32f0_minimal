@@ -9,17 +9,12 @@ static void initSystick();
 static void configureClock();
 static void initGPIO();
 static void delay(uint32_t);
+static void toggleLed();
 void SystemInit();
 
 int main()
 {
-    while(true)
-    {
-        // Toggle green LED.
-        int odr = GPIOC->ODR ;
-        GPIOC->BSRR = ((odr & GPIO_PIN_9) << 16) | (~odr & GPIO_PIN_9);
-        delay(1000);
-    } 
+    while(1); 
     return 0;
 }
 
@@ -77,7 +72,6 @@ static void configureClock()
     while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL); // 10
 }
 
-
 static void delay(uint32_t d)
 {
     for(int i = 0; i < 1000; i++)
@@ -99,10 +93,16 @@ static void initTimer()
 
     // Set prescalar.
     TIM6->PSC = 48 - 1; // 48Mhz/48 = 1Mhz ~~ 1us delay
+    TIM6->PSC = (48 * 1000000) - 1; // 48Mhz/48 = 1Mhz ~~ 1us delay
     TIM6->ARR = 0xffff;
+
+    // Enable the interrupt.
+    TIM6->DIER = 0x0001U;
 
     // Enable the timer.
     TIM6->CR1 |= 0x00001U;
+
+    NVIC_EnableIRQ(TIM6_DAC_IRQn);
 
     // Wait for update flag.
     while(!(TIM6->SR & 0x1U));
@@ -111,8 +111,8 @@ static void initTimer()
 static void initGPIO()
 {
     volatile uint32_t readBit;
-    constexpr uint32_t position { 9 };
-    constexpr uint32_t pushPullModeMask { 0x1UL };
+    const uint32_t position = 9;
+    const uint32_t pushPullModeMask = 0x1UL;
 
     // Enable clock for GPIO port C.
     RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
@@ -129,10 +129,22 @@ static void initGPIO()
     GPIOC->MODER = temp;
 }
 
+void toggleLed()
+{
+    // Toggle green LED.
+    int odr = GPIOC->ODR ;
+    GPIOC->BSRR = ((odr & GPIO_PIN_9) << 16) | (~odr & GPIO_PIN_9);
+}
+
 void SystemInit()
 {
     initSystick();
     configureClock();
     initGPIO();
     initTimer();
+}
+
+void TIM6_DAC_IRQHandler()
+{
+    toggleLed();
 }
