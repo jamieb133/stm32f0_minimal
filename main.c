@@ -5,37 +5,46 @@
 #include "core_cm0.h"
 #include "defs.h"
 
-static void systick_init();
-static void configure_clock();
-static void gpio_init();
-static void delay(uint32_t);
-static void toggle_led();
-static void led_on();
-static void led_off();
-static void timer_init();
-static void adc_init();
-static uint16_t adc_read();
+// Clock 
+static void systick_init(void);
+static void configure_clock(void);
 
-#define SET_BIT(REG, POS) REG |= (1 << POS)
-#define CLEAR_BIT(REG, POS) REG &= 0xffffffff & ~(1 << POS)
+// GPIO
+static void gpio_init(void);
+static void toggle_led(void);
+
+// Timer
+static void timer_init(void);
+static void delay(uint32_t);
+
+// ADC
+static void adc_init(void);
+static void adc_enable(void);
+static uint16_t adc_read(void);
+
+#define SET_REG_BIT(REG, POS) REG |= (1 << POS)
+#define CLEAR_REG_BIT(REG, POS) REG &= 0xffffffff & ~(1 << POS)
+#define WRITE_REG_MASK(REG, MASK, VAL, POS) REG = (REG & ~(MASK << POS)) | (VAL << POS)
 
 int main()
 {
+    gpio_init();
+    timer_init();
+    adc_init();
     adc_enable();
 
     while(1)
     {
-       uint16_t adc_val = adc_read();
-        if(adc_val > 3000)
+        uint16_t adc_val = adc_read();
+        if (adc_val > 2048)
             toggle_led();
-
-        delay(500);
-
+        delay(125);
     }
+    
     return 0;
 }
 
-static void systick_init()
+void systick_init(void)
 {
     // Enable prefetch on the buffer.
     FLASH->ACR |= FLASH_ACR_PRFTBE;
@@ -46,7 +55,7 @@ static void systick_init()
 
 // See page 942 of the reference manual 
 // https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf#page=942&zoom=100,165,146
-static void configure_clock()
+void configure_clock(void)
 {
     // Enable the internal  clock (HSI) and clock security system (CSS).
     RCC->CR |= RCC_CR_CSSON | RCC_CR_HSION;
@@ -78,7 +87,7 @@ static void configure_clock()
     while((RCC->CR & RCC_CR_PLLRDY) != 0);
 
     // Set PLL mutliplier to 12.
-    RCC->CFGR = RCC->CFGR & (~RCC_CFGR_PLLMUL) | (RCC_CFGR_PLLMUL12);
+    RCC->CFGR = (RCC->CFGR & (~RCC_CFGR_PLLMUL)) | (RCC_CFGR_PLLMUL12);
 
     // Enable the PLL.
     RCC->CR |= RCC_CR_PLLON;
@@ -94,13 +103,13 @@ static void configure_clock()
 
 }
 
-static void delay(uint32_t d)
+void delay(uint32_t d)
 {
     TIM6->CNT = 0x0000U;
     while(TIM6->CNT < d);
 }
 
-static void timer_init()
+void timer_init(void)
 {
     // Enable timer clock.
     // From page 125 of ref manual:
@@ -125,17 +134,16 @@ static void timer_init()
     while(!(TIM6->SR & 0x1U));
 }
 
-static void enable_timer_isr()
+void enable_timer_isr(void)
 {
     NVIC_EnableIRQ(TIM6_DAC_IRQn);
 }
 
-static void gpio_init()
+void gpio_init(void)
 {
     volatile uint32_t readBit;
     const uint32_t position = 9;
     const uint32_t pushPullModeMask = 0x1UL;
-    const uint16_t alternateMode = 2U; 
 
     // Enable clock for GPIO port C.
     RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
@@ -152,14 +160,14 @@ static void gpio_init()
     GPIOC->MODER = temp;
 }
 
-void toggle_led()
+void toggle_led(void)
 {
     // Toggle green LED.
     int odr = GPIOC->ODR ;
     GPIOC->BSRR = ((odr & GPIO_PIN_9) << 16) | (~odr & GPIO_PIN_9);
 }
 
-void adc_init()
+void adc_init(void)
 {
     // Enable the ADC clock.
     const int adc_clock_position = 9;
@@ -183,16 +191,16 @@ void adc_init()
     ADC1->CFGR1 &= 0xffffffff & ~(3 << res_position);
 
     // Use the ADC asyncronous clock (val = 0).
-    CLEAR_BIT(ADC1->CFGR2, 30);
+    CLEAR_REG_BIT(ADC1->CFGR2, 30);
 
     // Set the scanning direction to forward.
-    CLEAR_BIT(ADC1->CFGR1, 2);
+    CLEAR_REG_BIT(ADC1->CFGR1, 2);
 
     // Use continuous conversions.
-    CLEAR_BIT(ADC1->CFGR2, 13);
+    CLEAR_REG_BIT(ADC1->CFGR2, 13);
 
     // Set alignment to right alignment.
-    CLEAR_BIT(ADC1->CFGR2, 5);
+    CLEAR_REG_BIT(ADC1->CFGR2, 5);
 
     // Set the sampling time as 1us, the formula is (1.5 + selected_sampling_t) * 14MHz.
     // i.e. (12.5 + 1.5) * (1 / 14000000) seconds = 1e-6 seconds.
@@ -200,20 +208,20 @@ void adc_init()
     ADC1->SMPR &= ~7;
 }
 
-void adc_enable()
+void adc_enable(void)
 {
     // Enable the ADC.
-    SET_BIT(ADC1->CR, 0);
+    SET_REG_BIT(ADC1->CR, 0);
 
     // Wait until the ADC is ready.
     const int status_reg_pos = 0;
     while(!(ADC1->ISR & (1 << status_reg_pos)));
 }
 
-uint16_t adc_read()
+uint16_t adc_read(void)
 {
     // Start the ADC.
-    SET_BIT(ADC1->CR, 2);
+    SET_REG_BIT(ADC1->CR, 2);
 
     // Wait for the conversion to finish.
     const int eoc_flag_pos = 2;
@@ -227,9 +235,6 @@ void SystemInit()
 {
     systick_init();
     configure_clock();
-    gpio_init();
-    timer_init();
-    adc_init();
 }
 
 /*******************************/
