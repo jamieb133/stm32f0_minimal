@@ -26,6 +26,27 @@ static uint16_t adc_read(void);
 #define CLEAR_REG_BIT(REG, POS) REG &= 0xffffffff & ~(1 << POS)
 #define WRITE_REG_MASK(REG, MASK, VAL, POS) REG = (REG & ~(MASK << POS)) | (VAL << POS)
 
+static void toggle_example()
+{
+    toggle_led();
+    int delay = 1000000;
+    while(--delay);
+}
+
+static void timer_example()
+{
+    toggle_led();
+    delay(250);
+}
+
+static void adc_example()
+{
+    uint16_t adc_val = adc_read();
+    toggle_led();
+    int wait = (int)(((double)adc_val / 4096.0) * 500.0);
+    delay(wait);
+}
+
 int main()
 {
     gpio_init();
@@ -33,12 +54,11 @@ int main()
     adc_init();
     adc_enable();
 
+    //enable_timer_isr();
+
     while(1)
     {
-        uint16_t adc_val = adc_read();
-        if (adc_val > 2048)
-            toggle_led();
-        delay(125);
+        adc_example();
     }
     
     return 0;
@@ -244,5 +264,5 @@ Interrupt services routines.
 
 void TIM6_DAC_IRQHandler()
 {
-   toggle_led();
+    toggle_led();
 }
